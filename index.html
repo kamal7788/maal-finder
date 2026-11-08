@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Maal Finder — Marriage</title>
+<style>
+:root{--bg:#0f1216;--panel:#171c22;--card:#1e252d;--line:#2a323c;--text:#e8edf2;--muted:#93a1b0;--accent:#e0b64a;--red:#ff8a8a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:880px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.5rem;margin:0 0 4px}
+h2{font-size:.75rem;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+h3{font-size:.7rem;margin:14px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.sub{color:var(--muted);margin:0 0 18px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.hidden{display:none}
+.muted{color:var(--muted)}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:5px;font-size:.8rem;color:var(--muted)}
+input[type=text]{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit;min-width:170px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg label{padding:7px 12px;background:var(--card);cursor:pointer;color:var(--muted);font-size:.85rem}
+.seg label:has(input:checked){background:#2c3541;color:var(--text)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.check{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);cursor:pointer}
+.check input{accent-color:var(--accent)}
+.suit-row{display:flex;gap:5px;align-items:center;margin-bottom:6px;overflow-x:auto;padding-bottom:3px}
+.suit-label{width:22px;flex:0 0 auto;text-align:center;font-size:1.1rem}
+.red{color:var(--red)!important}
+.card-btn{flex:0 0 auto;width:40px;height:46px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font:700 14px/1 inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.card-btn:hover{border-color:var(--accent)}
+.card-btn:active{transform:scale(.94)}
+.card-btn .s{font-size:10px;opacity:.6}
+.card-btn.small{width:46px;height:38px;font-size:13px}
+.card-btn.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-weight:700;font-size:.85rem}
+.chip button{border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;padding:0 5px}
+.chip button:hover{color:var(--text)}
+.card{display:inline-flex;padding:3px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);font-weight:700;font-size:.9rem;white-space:nowrap}
+.role{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 10px 0 4px}
+.status{font-size:1.05rem;margin-bottom:4px}
+.status strong{color:var(--accent)}
+.banner{padding:12px 14px;border-radius:10px;margin-top:12px;border:1px solid;font-size:.9rem}
+.banner.ok{border-color:#2f6b4f;background:#13241b}
+.banner.warn{border-color:#7a5f1e;background:#262013}
+.banner.bad{border-color:#7a2f2f;background:#261616}
+button.action{margin-left:6px;margin-top:4px;padding:6px 11px;border-radius:8px;cursor:pointer;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-size:.85rem}
+button.action:hover{background:rgba(224,182,74,.12)}
+.toolbar{display:flex;gap:8px;margin-top:14px}
+.toolbar button{padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;font-size:.85rem;cursor:pointer}
+.toolbar button:hover{border-color:var(--muted)}
+.cand-grid{display:flex;flex-wrap:wrap;gap:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
+  .selma{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}
+  .hint{color:var(--muted);font-size:.85rem;margin:0 0 12px}
+  .rank-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:360px}
+  .rank-btn{padding:12px 0;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font:700 1rem/1 inherit;cursor:pointer}
+  .rank-btn:hover{border-color:var(--accent)}
+  .rank-btn.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent)}
+  .suit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:360px;margin-top:8px}
+  .suit-btn{padding:12px 0;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font:700 1.15rem/1 inherit;cursor:pointer}
+  .suit-btn:hover{border-color:var(--accent)}
+  .suit-btn.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .staging{margin-top:12px;min-height:20px}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;max-width:360px}
+  .act{padding:13px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font:700 .95rem/1 inherit;cursor:pointer}
+  .act:hover{border-color:var(--accent)}
+  .act.drop{border-color:#7a5f1e}
+  .act.pick{border-color:#2f6b4f}
+  .toast{min-height:20px;margin-top:8px;font-size:.85rem;color:var(--muted)}
+  .toast.err{color:var(--red)}
+  .rec-row{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
+  .rec-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:62px;flex:0 0 auto;padding-top:6px}
+  .rec-row .chips{margin-top:0}
+
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Maal Finder</h1>
+    <p class="sub">Find the tiplu (main joker) from seen players' drops and picks. 3-deck Marriage.</p>
+  </header>
+
+  <section>
+    <h2>Table setup</h2>
+    <div class="row">
+      <label class="field">First seer / tiplu drawer
+        <input id="drawer" type="text" value="First seer" autocomplete="off" spellcheck="false">
+      </label>
+      <fieldset style="border:0;padding:0;margin:0;font-size:.8rem;color:var(--muted)">
+        <legend style="padding:0 0 6px">I am</legend>
+        <div class="seg">
+          <label><input type="radio" name="operator" value="unseen" checked> Unseen</label>
+          <label><input type="radio" name="operator" value="seen"> Seen</label>
+        </div>
+      </fieldset>
+      <label class="check">
+        <input id="allWilds" type="checkbox" checked>
+        Also protect ordinary jokers
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Record seen-player actions</h2>
+    <p class="hint">Pick a number, then one or more suits. Tap Dropped / Picked to record all selected cards at once. Only mark cards touched by players who have seen the tiplu.</p>
+    <div id="rankGrid" class="rank-grid"></div>
+    <div id="suitGrid" class="suit-grid"></div>
+    <div id="staging" class="staging"></div>
+    <div class="actions">
+      <button id="btnDrop" class="act drop" type="button">Dropped</button>
+      <button id="btnPick" class="act pick" type="button">Picked</button>
+    </div>
+    <div id="toast" class="toast" role="status"></div>
+    <div id="recorded"></div>
+    <div class="toolbar">
+      <button id="undo" type="button">Undo last action</button>
+      <button id="newgame" type="button">New game</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Result</h2>
+    <div id="status" class="status"></div>
+    <div id="banner" class="banner hidden"></div>
+    <div id="candidates"></div>
+    <div id="save"></div>
+  </section>
+
+  <details>
+    <summary>How this works</summary>
+    <p>Marriage uses 3 decks, 21 cards each. The first player to show three pure melds turns the
+    <strong>tiplu</strong> (main joker); only seen players know it. A seen player never drops the tiplu,
+    poplu, jhiplu, alter (or ordinary jokers, if protected), and cannot pick a wild from the discard.
+    So every card they drop or pick rules out tiplu candidates. When one candidate remains you get the
+    joker and the maal to hold. A card marked Picked and then Dropped is locked and cannot be picked
+    again. If none remain, a seen player touched a protected card — a misinput or a leak.</p>
+  </details>
+</main>
+
+<script>
+(function(){
+  'use strict';
+  var RANKS = [2,3,4,5,6,7,8,9,10,11,12,13,14];
+  var LABEL = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
+  var SUITS = [{id:'S',sym:'♠',red:false},{id:'H',sym:'♥',red:true},{id:'D',sym:'♦',red:true},{id:'C',sym:'♣',red:false}];
+  var BY_ID = {}; SUITS.forEach(function(s){ BY_ID[s.id] = s; });
+  var SAME_COLOR = {S:'C',C:'S',H:'D',D:'H'};
+  var KEY = 'maal-finder-v2';
+  function $(s){ return document.querySelector(s); }
+  function nextRank(r){ return r===14?2:r+1; }
+  function prevRank(r){ return r===2?14:r-1; }
+  function cardText(c){ return LABEL[c.rank]+BY_ID[c.suit].sym; }
+  function cardHTML(c){ return '<span class="card'+(BY_ID[c.suit].red?' red':'')+'">'+LABEL[c.rank]+BY_ID[c.suit].sym+'</span>'; }
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+
+  function wildSet(rank,suit,allWilds){
+    var out=[],seen={};
+    function add(r,s){ var k=r+':'+s; if(!seen[k]){seen[k]=1;out.push({rank:r,suit:s});} }
+    if(allWilds){ SUITS.forEach(function(s){ add(rank,s.id); }); }
+    else { add(rank,suit); add(rank,SAME_COLOR[suit]); }
+    add(nextRank(rank),suit); add(prevRank(rank),suit);
+    return out;
+  }
+  function allCandidates(){
+    var out=[]; SUITS.forEach(function(s){ RANKS.forEach(function(r){ out.push({rank:r,suit:s.id}); }); }); return out;
+  }
+  function candidatesFor(throws,allWilds){
+    var dead={}; throws.forEach(function(t){ dead[t.rank+':'+t.suit]=1; });
+    return allCandidates().filter(function(c){
+      return !wildSet(c.rank,c.suit,allWilds).some(function(w){ return dead[w.rank+':'+w.suit]; });
+    });
+  }
+  function saveUnion(cands,allWilds){
+    var map={};
+    cands.forEach(function(c){ wildSet(c.rank,c.suit,allWilds).forEach(function(w){ map[w.rank+':'+w.suit]=w; }); });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
+  function rolesFor(c,allWilds){
+    var roles=[{role:'tiplu',card:c},
+      {role:'poplu',card:{rank:nextRank(c.rank),suit:c.suit}},
+      {role:'jhiplu',card:{rank:prevRank(c.rank),suit:c.suit}}];
+    if(allWilds){
+      roles.push({role:'alter',card:{rank:c.rank,suit:SAME_COLOR[c.suit]}});
+      SUITS.forEach(function(s){
+        if(s.id===c.suit||s.id===SAME_COLOR[c.suit]) return;
+        roles.push({role:'joker',card:{rank:c.rank,suit:s.id}});
+      });
+    } else { roles.push({role:'alter',card:{rank:c.rank,suit:SAME_COLOR[c.suit]}}); }
+    return roles;
+  }
+
+  var defaultState={cards:{},staging:[],selRank:null,history:[],drawer:'First seer',operator:'unseen',allWilds:true,selected:null,disqualified:false};
+  var state=load();
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+  function load(){
+    try{
+      var s=JSON.parse(localStorage.getItem(KEY));
+      if(s&&s.cards&&typeof s.cards==='object'){
+        var out={}; Object.keys(defaultState).forEach(function(k){ out[k]=(k in s)?s[k]:clone(defaultState[k]); });
+        return out;
+      }
+    }catch(e){}
+    var f={}; Object.keys(defaultState).forEach(function(k){ f[k]=clone(defaultState[k]); }); return f;
+  }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+
+  function keyOf(c){ return c.rank+':'+c.suit; }
+  function parseKey(k){ var p=k.split(':'); return {rank:+p[0],suit:p[1]}; }
+  function touched(){ return Object.keys(state.cards).map(parseKey); }
+  function sortCards(a,b){ return 'SHDC'.indexOf(a.suit)-'SHDC'.indexOf(b.suit) || a.rank-b.rank; }
+  function render(){
+    var cands=candidatesFor(touched(),state.allWilds);
+    if(state.selected&&!cands.some(function(c){ return keyOf(c)===state.selected; })) state.selected=null;
+    renderPickers(); renderStaging(); renderRecorded(); renderResult(cands);
+  }
+  function renderPickers(){
+    $('#rankGrid').innerHTML=RANKS.map(function(r){
+      return '<button type="button" class="rank-btn'+(state.selRank===r?' sel':'')+'" data-rank="'+r+'">'+LABEL[r]+'</button>';
+    }).join('');
+    $('#suitGrid').innerHTML=SUITS.map(function(s){
+      var on=state.selRank!=null&&state.staging.indexOf(state.selRank+':'+s.id)>=0;
+      return '<button type="button" class="suit-btn'+(s.red?' red':'')+(on?' sel':'')+'" data-suit="'+s.id+'">'+s.sym+'</button>';
+    }).join('');
+  }
+  function renderStaging(){
+    var el=$('#staging');
+    if(!state.staging.length){ el.innerHTML='<span class="muted">Selected cards appear here.</span>'; return; }
+    el.innerHTML=state.staging.map(function(k){
+      var c=parseKey(k);
+      return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+'">'+cardText(c)+'<button type="button" data-unstage="'+k+'" title="Remove">×</button></span>';
+    }).join('');
+  }
+  function renderRecorded(){
+    var groups={dropped:[],picked:[],locked:[]};
+    Object.keys(state.cards).forEach(function(k){ groups[state.cards[k]].push(parseKey(k)); });
+    var labels={dropped:'Dropped',picked:'Picked',locked:'Locked'};
+    var html='';
+    ['dropped','picked','locked'].forEach(function(g){
+      if(!groups[g].length) return;
+      groups[g].sort(sortCards);
+      html+='<div class="rec-row"><span class="rec-label">'+labels[g]+'</span><div class="chips">'+
+        groups[g].map(function(c){ return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+'">'+cardText(c)+'</span>'; }).join('')+
+        '</div></div>';
+    });
+    $('#recorded').innerHTML=html;
+  }
+  function disqButton(){
+    if(state.disqualified) return ' <button class="action" type="button" data-undisq>Undo disqualify</button>';
+    return ' <button class="action" type="button" data-disq>Disqualify '+esc(state.drawer)+'</button>';
+  }
+  function renderResult(cands){
+    var status=$('#status'), banner=$('#banner'), candEl=$('#candidates'), saveEl=$('#save');
+    candEl.innerHTML=''; saveEl.innerHTML=''; banner.className='banner hidden'; banner.innerHTML='';
+    if(cands.length===0){
+      status.innerHTML='<strong>No possible tiplu left.</strong>';
+      banner.className='banner bad';
+      banner.innerHTML='A seen player dropped or picked a card that is maal under every remaining option. Check the entry, or the seer touched a protected card (a leak / illegal action).'+disqButton();
+      return;
+    }
+    if(cands.length===1){
+      var c=cands[0];
+      status.innerHTML='Joker / tiplu found: '+cardHTML(c);
+      saveEl.innerHTML='<h3>Save these (maal)</h3>'+rolesFor(c,state.allWilds).map(function(r){
+        return cardHTML(r.card)+'<span class="role">'+r.role+'</span>';
+      }).join(' ');
+      if(state.disqualified){
+        banner.className='banner bad';
+        banner.innerHTML='DISQUALIFIED: <strong>'+esc(state.drawer)+'</strong> (tiplu drawer).'+disqButton();
+      } else if(state.operator==='unseen'){
+        banner.className='banner warn';
+        banner.innerHTML='An unseen player (you) has identified the joker. By your rule, the tiplu drawer <strong>'+esc(state.drawer)+'</strong> is disqualified.'+disqButton();
+      }
+      return;
+    }
+    status.innerHTML='<strong>'+cands.length+'</strong> possible tiplus. Record more seen-player actions to narrow.';
+    candEl.innerHTML='<h3>Possible tiplus</h3><div class="cand-grid">'+cands.map(function(c){
+      var key=c.rank+':'+c.suit;
+      return '<button type="button" class="card-btn small'+(BY_ID[c.suit].red?' red':'')+(state.selected===key?' sel':'')+'" data-pick="'+key+'">'+LABEL[c.rank]+BY_ID[c.suit].sym+'</button>';
+    }).join('')+'</div>';
+    if(cands.length<=12){
+      var union=saveUnion(cands,state.allWilds);
+      saveEl.innerHTML='<h3>Keep these (any could be maal)</h3><div class="chips">'+union.map(function(c){ return cardHTML(c); }).join('')+'</div>';
+    } else {
+      saveEl.innerHTML='<h3>Keep these</h3><p class="muted" style="font-size:.85rem;margin:0">Too many tiplu options for a useful list. Tap a possible tiplu above to see its exact maal, or record more actions.</p>';
+    }
+    if(state.selected){
+      var sel=cands.filter(function(x){ return x.rank+':'+x.suit===state.selected; })[0];
+      if(sel){
+        saveEl.innerHTML+='<div class="selma"><h3>If tiplu = '+cardText(sel)+'</h3>'+rolesFor(sel,state.allWilds).map(function(r){
+          return cardHTML(r.card)+'<span class="role">'+r.role+'</span>';
+        }).join(' ')+'</div>';
+      }
+    }
+  }
+  var toastTimer=null;
+  function toast(msg,err){
+    var el=$('#toast');
+    el.textContent=msg;
+    el.className='toast'+(err?' err':'');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){ if(el.textContent===msg){ el.textContent=''; el.className='toast'; } },3500);
+  }
+  function transition(cur,action){
+    if(action==='dropped'){
+      if(cur==='picked') return 'locked';
+      if(cur==='none') return 'dropped';
+      return cur;
+    }
+    if(cur==='locked') return null;
+    return 'picked';
+  }
+  function applyAction(action){
+    if(!state.staging.length){ toast('Select at least one card first.',true); return; }
+    state.history.push(JSON.stringify(state.cards));
+    if(state.history.length>200) state.history.shift();
+    var blocked=[];
+    state.staging.slice().forEach(function(k){
+      var next=transition(state.cards[k]||'none',action);
+      if(next===null){ blocked.push(k); return; }
+      state.cards[k]=next;
+    });
+    state.staging=[];
+    save(); render();
+    if(blocked.length){ toast(blocked.map(function(k){ return cardText(parseKey(k)); }).join(', ')+' was picked then dropped — cannot pick again.',true); }
+    else { toast(action==='dropped'?'Marked dropped.':'Marked picked.'); }
+  }
+  function undo(){
+    if(!state.history.length){ toast('Nothing to undo.',true); return; }
+    state.cards=JSON.parse(state.history.pop());
+    state.staging=[];
+    save(); render(); toast('Undone.');
+  }
+  function newGame(){
+    if(!window.confirm('Clear all recorded cards and start a new game?')) return;
+    state.cards={}; state.staging=[]; state.selRank=null; state.history=[];
+    state.selected=null; state.disqualified=false;
+    save(); render(); toast('New game ready.');
+  }
+  function syncControls(){
+    $('#drawer').value=state.drawer;
+    document.querySelectorAll('input[name=operator]').forEach(function(el){ el.checked=(el.value===state.operator); });
+    $('#allWilds').checked=state.allWilds;
+  }
+  function onClick(e){
+    var rank=e.target.closest('[data-rank]');
+    if(rank){ state.selRank=parseInt(rank.getAttribute('data-rank'),10); render(); return; }
+    var suit=e.target.closest('[data-suit]');
+    if(suit){
+      if(state.selRank==null){ toast('Pick a number first.',true); return; }
+      var k=state.selRank+':'+suit.getAttribute('data-suit');
+      var i=state.staging.indexOf(k);
+      if(i>=0) state.staging.splice(i,1); else state.staging.push(k);
+      render(); return;
+    }
+    var unstage=e.target.closest('[data-unstage]');
+    if(unstage){ var j=state.staging.indexOf(unstage.getAttribute('data-unstage')); if(j>=0) state.staging.splice(j,1); render(); return; }
+    var pick=e.target.closest('[data-pick]');
+    if(pick){ var key=pick.getAttribute('data-pick'); state.selected=(state.selected===key)?null:key; render(); return; }
+    if(e.target.closest('[data-disq]')){ state.disqualified=true; save(); render(); return; }
+    if(e.target.closest('[data-undisq]')){ state.disqualified=false; save(); render(); return; }
+  }
+
+  function selfTest(){
+    function assert(c,m){ if(!c) throw new Error(m); }
+    function has(cs,r,s){ return cs.some(function(c){ return c.rank===r&&c.suit===s; }); }
+    assert(candidatesFor([],true).length===52,'52 candidates');
+    var c=candidatesFor([{rank:8,suit:'H'}],true);
+    assert(!has(c,8,'S')&&!has(c,8,'H')&&!has(c,8,'D')&&!has(c,8,'C'),'all-wilds wipes rank');
+    c=candidatesFor([{rank:9,suit:'S'}],true);
+    assert(!has(c,8,'S')&&has(c,8,'H'),'poplu only same suit');
+    c=candidatesFor([{rank:7,suit:'S'}],true);
+    assert(!has(c,8,'S'),'jhiplu kills tiplu');
+    c=candidatesFor([{rank:8,suit:'H'}],false);
+    assert(has(c,8,'S'),'maal-only: off-colour joker not protected');
+    c=candidatesFor([{rank:8,suit:'C'}],false);
+    assert(!has(c,8,'S'),'maal-only: alter protected');
+    c=candidatesFor([{rank:2,suit:'S'}],true);
+    assert(!has(c,14,'S'),'ace poplu wraps to 2');
+    c=candidatesFor([{rank:13,suit:'S'}],true);
+    assert(!has(c,14,'S'),'ace jhiplu wraps to K');
+    var t=SUITS.map(function(s){ return {rank:8,suit:s.id}; });
+    c=candidatesFor(t,true);
+    assert(!c.some(function(x){ return x.rank===8; }),'four suits wipe rank');
+    t=[];
+    RANKS.forEach(function(r){
+      if(r===7||r===8||r===9) return;
+      SUITS.forEach(function(s){ t.push({rank:r,suit:s.id}); });
+    });
+    [7,9].forEach(function(r){
+      SUITS.forEach(function(s){ if(s.id!=='S') t.push({rank:r,suit:s.id}); });
+    });
+    c=candidatesFor(t,true);
+    assert(c.length===1&&c[0].rank===8&&c[0].suit==='S','narrow to one tiplu');
+    assert(transition('none','picked')==='picked','pick fresh');
+    assert(transition('dropped','picked')==='picked','pick dropped');
+    assert(transition('picked','dropped')==='locked','drop picked locks');
+    assert(transition('locked','picked')===null,'locked cannot be picked');
+    return true;
+  }
+
+  syncControls();
+  document.addEventListener('click',onClick);
+  $('#drawer').addEventListener('input',function(e){ state.drawer=e.target.value||'First seer'; save(); render(); });
+  document.querySelectorAll('input[name=operator]').forEach(function(el){
+    el.addEventListener('change',function(e){ state.operator=e.target.value; save(); render(); });
+  });
+  $('#allWilds').addEventListener('change',function(e){ state.allWilds=e.target.checked; state.selected=null; save(); render(); });
+  $('#btnDrop').addEventListener('click',function(){ applyAction('dropped'); });
+  $('#btnPick').addEventListener('click',function(){ applyAction('picked'); });
+  $('#undo').addEventListener('click',undo);
+  $('#newgame').addEventListener('click',newGame);
+  render();
+
+  if(location.hash==='#test'){
+    try{ selfTest(); document.body.insertAdjacentHTML('afterbegin','<div class="banner ok" style="max-width:880px;margin:16px auto">Self-test: PASS</div>'); }
+    catch(err){ document.body.insertAdjacentHTML('afterbegin','<div class="banner bad" style="max-width:880px;margin:16px auto">Self-test FAIL: '+esc(err.message)+'</div>'); console.error(err); }
+  }
+})();
+</script>
+</body>
+</html>
