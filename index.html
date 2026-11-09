@@ -68,19 +68,23 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   .staging{margin-top:12px;min-height:20px}
   .action-row{display:grid;gap:8px;margin-top:8px;max-width:420px}
   .action-row.three{grid-template-columns:repeat(3,1fr)}
-  .action-row.two{grid-template-columns:repeat(2,1fr)}
   .act{padding:12px 6px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font:700 .84rem/1.15 inherit;cursor:pointer}
   .act:hover{border-color:var(--accent)}
   .act.drop{border-color:#7a5f1e}
   .act.pass{border-color:#3a5f86}
-  .act.shown{border-color:#6a5a8a}
   .act.pick{border-color:#2f6b4f}
-  .act.wild{border-color:#2f6b4f;background:#14241c}
   .mini{font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-left:4px}
-  .chip.picked,.chip.wild{border-color:#2f6b4f;background:#14241c}
-  .chip.shown{border-color:#6a5a8a;background:#1f1a2a}
+  .chip.picked{border-color:#2f6b4f;background:#14241c}
   .note{font-size:.82rem;color:var(--muted);margin:8px 0 0;line-height:1.45}
   .note.warn{color:var(--accent)}
+  .val-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+  .val-item{display:grid;grid-template-columns:1fr auto;grid-template-areas:"card pct" "bar bar";gap:4px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
+  .val-item.hi{border-color:#2f6b4f;background:#14241c}
+  .val-item.lo{opacity:.6}
+  .val-card{grid-area:card;font-weight:700;font-size:.98rem}
+  .val-pct{grid-area:pct;font-weight:700;color:#4cc38a;font-variant-numeric:tabular-nums;font-size:.85rem}
+  .val-bar{grid-area:bar;height:4px;border-radius:99px;background:#2a323c;overflow:hidden}
+  .val-bar i{display:block;height:100%;background:#4cc38a;border-radius:99px}
   .cand-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
   .cand-item{display:grid;grid-template-columns:1fr auto;grid-template-areas:"card pct" "bar bar";gap:4px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);cursor:pointer;font:inherit;text-align:left}
   .cand-item:hover{border-color:var(--accent)}
@@ -127,18 +131,14 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
 
   <section>
     <h2>Record seen-player actions</h2>
-    <p class="hint">Pick a number, then one or more suits. Only mark actions by players who have seen the tiplu. <strong>Dropped / Not picked / Shown pure</strong> rule a card out. <strong>Picked</strong> raises nearby tiplus (soft). <strong>Used as wild</strong> (a card substituting in a meld) is the strongest clue. Tip: enter the first seer's 9 shown pure-meld cards as Shown pure. Confidence starts at 1/52 ≈ 1.9%.</p>
+    <p class="hint">Pick a number, then one or more suits, then the action. Only mark actions by players who have seen the tiplu. <strong>Dropped / Not picked</strong> rule a card out. <strong>Picked</strong> is soft evidence (could be a sequence). Below: tiplu odds + every card's chance of being maal/wild — high = keep, low = discard.</p>
     <div id="rankGrid" class="rank-grid"></div>
     <div id="suitGrid" class="suit-grid"></div>
     <div id="staging" class="staging"></div>
     <div class="action-row three">
       <button id="btnDrop" class="act drop" type="button">Dropped</button>
       <button id="btnPass" class="act pass" type="button">Not picked</button>
-      <button id="btnShown" class="act shown" type="button">Shown pure</button>
-    </div>
-    <div class="action-row two">
       <button id="btnPick" class="act pick" type="button">Picked</button>
-      <button id="btnWild" class="act wild" type="button">Used as wild</button>
     </div>
     <div id="toast" class="toast" role="status"></div>
     <div id="recorded"></div>
@@ -153,6 +153,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     <div id="status" class="status"></div>
     <div id="note" class="note"></div>
     <div id="banner" class="banner hidden"></div>
+    <div id="values"></div>
     <div id="candidates"></div>
     <div id="save"></div>
   </section>
@@ -160,14 +161,14 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   <details>
     <summary>How this works</summary>
     <p>Marriage uses 3 decks, 21 cards each. The first player to show three pure melds turns the
-    <strong>tiplu</strong> (main joker); only seen players know it. A seen player never drops the tiplu,
-    poplu, jhiplu, alter (or ordinary jokers, if protected), so <strong>Dropped</strong> is a rule-out.
-    <strong>Not picked</strong> and <strong>Shown pure</strong> are also rule-outs: they would pick a
-    valuable card, and cards in a pure show meld are never wild. <strong>Picked</strong> is soft evidence:
-    each picked card that is wild for a tiplu multiplies that tiplu's score (it could be for a sequence).
-    <strong>Used as wild</strong> is the strongest clue: only tiplus that make that card wild survive.
-    Scores normalize to 100%; with no input every card sits at 1/52 ≈ 1.9%. Picked then Dropped locks and
-    cannot be picked again. If none remain, the clues contradict — a misinput or a leak.</p>
+    <strong>tiplu</strong> (main joker); only seen players know it. Before you show, you can only use
+    public actions by players who have already seen it. A seen player never drops the tiplu, poplu, jhiplu,
+    alter (or ordinary jokers, if protected), so <strong>Dropped</strong> is a rule-out. If they leave a
+    discard in the pile (<strong>Not picked</strong>), it is also a rule-out — they would pick a valuable
+    card. <strong>Picked</strong> is soft evidence: each picked card that is wild for a tiplu multiplies
+    that tiplu's score (it could be for a sequence). Scores normalize to 100%; with no input every tiplu
+    sits at 1/52 ≈ 1.9%. The card list shows each card's chance of being wild/maal under the current
+    belief: high = keep, low = discard. Picked then Dropped locks and cannot be picked again.</p>
   </details>
 </main>
 
@@ -179,7 +180,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   var SUITS = [{id:'S',sym:'♠',red:false},{id:'H',sym:'♥',red:true},{id:'D',sym:'♦',red:true},{id:'C',sym:'♣',red:false}];
   var BY_ID = {}; SUITS.forEach(function(s){ BY_ID[s.id] = s; });
   var SAME_COLOR = {S:'C',C:'S',H:'D',D:'H'};
-  var KEY = 'maal-finder-v4';
+  var KEY = 'maal-finder-v5';
   function $(s){ return document.querySelector(s); }
   function nextRank(r){ return r===14?2:r+1; }
   function prevRank(r){ return r===2?14:r-1; }
@@ -203,11 +204,6 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     return allCandidates().filter(function(c){
       return !wildSet(c.rank,c.suit,allWilds).some(function(w){ return dead[w.rank+':'+w.suit]; });
     });
-  }
-  function saveUnion(cands,allWilds){
-    var map={};
-    cands.forEach(function(c){ wildSet(c.rank,c.suit,allWilds).forEach(function(w){ map[w.rank+':'+w.suit]=w; }); });
-    return Object.keys(map).map(function(k){ return map[k]; });
   }
   function rolesFor(c,allWilds){
     var roles=[{role:'tiplu',card:c},
@@ -240,25 +236,20 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
 
   function keyOf(c){ return c.rank+':'+c.suit; }
   function parseKey(k){ var p=k.split(':'); return {rank:+p[0],suit:p[1]}; }
-  function isSure(c){ return !!(c&&(c.dropped||c.passed||c.shown)); }
+  function isSure(c){ return !!(c&&(c.dropped||c.passed)); }
   function sortCards(a,b){ return 'SHDC'.indexOf(a.suit)-'SHDC'.indexOf(b.suit) || a.rank-b.rank; }
   var PICK_WEIGHT=5;
   function scoreCandidates(cards,allWilds){
-    var sure={},picks={},mustWild={};
+    var sure={},picks={};
     Object.keys(cards).forEach(function(k){
       var c=cards[k]||{};
-      if(c.dropped||c.passed||c.shown) sure[k]=1;
+      if(c.dropped||c.passed) sure[k]=1;
       if(c.picked) picks[k]=1;
-      if(c.wild) mustWild[k]=1;
     });
-    var wildKeys=Object.keys(mustWild);
     var list=[];
     allCandidates().forEach(function(T){
       var ws=wildSet(T.rank,T.suit,allWilds);
       if(ws.some(function(w){ return sure[w.rank+':'+w.suit]; })) return;
-      var ok=true;
-      wildKeys.forEach(function(k){ if(ok&&!ws.some(function(w){ return w.rank+':'+w.suit===k; })) ok=false; });
-      if(!ok) return;
       var m=0;
       ws.forEach(function(w){ if(picks[w.rank+':'+w.suit]) m++; });
       list.push({card:T,matches:m,weight:Math.pow(PICK_WEIGHT,m)});
@@ -266,7 +257,16 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     var total=list.reduce(function(s,x){ return s+x.weight; },0);
     list.forEach(function(x){ x.prob=total?x.weight/total:0; });
     list.sort(function(a,b){ return b.prob-a.prob || sortCards(a.card,b.card); });
-    return {list:list,total:total,eliminated:52-list.length,wilds:wildKeys,picks:Object.keys(picks)};
+    return {list:list,total:total,eliminated:52-list.length,picks:Object.keys(picks)};
+  }
+  function cardValues(list,allWilds){
+    var vals={};
+    allCandidates().forEach(function(c){ vals[keyOf(c)]=0; });
+    list.forEach(function(x){
+      wildSet(x.card.rank,x.card.suit,allWilds).forEach(function(w){ vals[keyOf(w)]+=x.prob; });
+    });
+    return Object.keys(vals).map(function(k){ return {card:parseKey(k),p:vals[k]}; })
+      .sort(function(a,b){ return b.p-a.p || sortCards(a.card,b.card); });
   }
   function analysis(){ return scoreCandidates(state.cards,state.allWilds); }
   function pct(p){ return (p*100).toFixed(1)+'%'; }
@@ -293,25 +293,22 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     }).join('');
   }
   function renderRecorded(){
-    var groups={dropped:[],passed:[],shown:[],picked:[],wild:[]};
+    var groups={dropped:[],passed:[],picked:[]};
     Object.keys(state.cards).forEach(function(k){
       var c=state.cards[k];
       if(c.dropped) groups.dropped.push(k);
       if(c.passed) groups.passed.push(k);
-      if(c.shown) groups.shown.push(k);
-      if(c.wild) groups.wild.push(k);
-      if(c.picked&&!c.dropped&&!c.passed&&!c.shown&&!c.wild) groups.picked.push(k);
+      if(c.picked&&!c.dropped&&!c.passed) groups.picked.push(k);
     });
-    var labels={dropped:'Dropped',passed:'Not picked',shown:'Shown pure',picked:'Picked (soft +)',wild:'Used as wild'};
+    var labels={dropped:'Dropped',passed:'Not picked',picked:'Picked (soft +)'};
     var html='';
-    ['dropped','passed','shown','picked','wild'].forEach(function(g){
+    ['dropped','passed','picked'].forEach(function(g){
       if(!groups[g].length) return;
       groups[g].sort(function(a,b){ return sortCards(parseKey(a),parseKey(b)); });
       html+='<div class="rec-row"><span class="rec-label">'+labels[g]+'</span><div class="chips">'+
         groups[g].map(function(k){
           var c=parseKey(k), f=state.cards[k];
-          var cls=g==='picked'?' picked':g==='wild'?' wild':g==='shown'?' shown':'';
-          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+cls+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+'</span>';
+          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+'</span>';
         }).join('')+
         '</div></div>';
     });
@@ -327,16 +324,26 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       return c&&c.picked;
     }).map(cardText);
   }
+  function renderValues(vals){
+    var maxV=vals.length?vals[0].p:0;
+    return '<h3>Keep ↔ discard — chance this card is maal/wild</h3>'+
+      '<p class="note" style="margin:0 0 8px">High % = keep. Low % = safe to discard.</p>'+
+      '<div class="val-list">'+vals.map(function(x){
+        var cls=x.p>=0.25?' hi':x.p<=0.04?' lo':'';
+        return '<div class="val-item'+cls+'"><span class="val-card'+(BY_ID[x.card.suit].red?' red':'')+'">'+cardText(x.card)+'</span><span class="val-pct">'+pct(x.p)+'</span><span class="val-bar"><i style="width:'+(maxV>0?x.p/maxV*100:0)+'%"></i></span></div>';
+      }).join('')+'</div>';
+  }
   function renderResult(a){
-    var status=$('#status'), note=$('#note'), banner=$('#banner'), candEl=$('#candidates'), saveEl=$('#save');
-    candEl.innerHTML=''; saveEl.innerHTML=''; banner.className='banner hidden'; banner.innerHTML=''; note.className='note'; note.innerHTML='';
+    var status=$('#status'), note=$('#note'), banner=$('#banner'), candEl=$('#candidates'), saveEl=$('#save'), valuesEl=$('#values');
+    candEl.innerHTML=''; saveEl.innerHTML=''; valuesEl.innerHTML=''; banner.className='banner hidden'; banner.innerHTML=''; note.className='note'; note.innerHTML='';
     var list=a.list;
     if(!list.length){
       status.innerHTML='<strong>No possible tiplu left.</strong>';
       banner.className='banner bad';
-      banner.innerHTML='A seen player dropped, passed, shown, or revealed a wild that contradicts every option. Check the entry, or the seer touched a protected card (a leak / illegal action).'+disqButton();
+      banner.innerHTML='A seen player dropped or passed a card that is wild/maal under every option. Check the entry, or the seer touched a protected card (a leak / illegal action).'+disqButton();
       return;
     }
+    valuesEl.innerHTML=renderValues(cardValues(list,state.allWilds));
     var top=list[0];
     if(list.length===1){
       status.innerHTML='Joker / tiplu found: '+cardHTML(top.card)+' — <strong>100%</strong>';
@@ -359,18 +366,15 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     var pickedKeys=a.picks||[];
     var activePicks=pickedKeys.filter(function(k){ return !isSure(state.cards[k]); });
     if(pickedKeys.length&&!activePicks.length){
-      notes.push('All picked cards are also Dropped / Not picked / Shown — the hard rule-out wins, so picks add no positive evidence.');
+      notes.push('All picked cards are also Dropped / Not picked — the hard rule-out wins, so picks add no positive evidence.');
       warn=true;
     } else if(pickedKeys.length&&top.matches===0){
-      notes.push('Picked cards add no positive evidence here: none is wild for the surviving tiplus. Add a Used-as-wild or Shown clue, or more picks.');
+      notes.push('Picked cards add no positive evidence here: none is wild for the surviving tiplus. Record more picks, or use the card-value list.');
       warn=true;
     }
-    if(!pickedKeys.length&&!(a.wilds&&a.wilds.length)){
-      notes.push('Negative clues only leave these candidates tied. Add Picked or Used-as-wild clues to rank them.');
+    if(!pickedKeys.length){
+      notes.push('Negative clues only leave these tiplus tied. Add Picked clues to rank them — the card-value list below still shows what to keep.');
       warn=true;
-    }
-    if(a.wilds&&a.wilds.length){
-      notes.push('Revealed wild: '+a.wilds.map(function(k){ return cardText(parseKey(k)); }).join(' ')+' — only tiplus that make these wild survive.');
     }
     var support=supportPicks(top.card);
     if(support.length){
@@ -391,10 +395,6 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       saveEl.innerHTML='<h3>'+(state.selected?'If tiplu = ':'Most likely maal (if ')+cardText(focus.card)+(state.selected?'':' is tiplu)')+'</h3>'+
         rolesFor(focus.card,state.allWilds).map(function(r){ return cardHTML(r.card)+'<span class="role">'+r.role+'</span>'; }).join(' ');
     }
-    if(list.length<=12){
-      var union=saveUnion(list.map(function(x){ return x.card; }),state.allWilds);
-      saveEl.innerHTML+='<div class="selma"><h3>Keep these (any could be maal)</h3><div class="chips">'+union.map(function(c){ return cardHTML(c); }).join('')+'</div></div>';
-    }
   }
   var toastTimer=null;
   function toast(msg,err){
@@ -405,12 +405,10 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     toastTimer=setTimeout(function(){ if(el.textContent===msg){ el.textContent=''; el.className='toast'; } },3500);
   }
   function nextFlags(flags,action){
-    var c={dropped:!!flags.dropped,passed:!!flags.passed,shown:!!flags.shown,picked:!!flags.picked,wild:!!flags.wild,locked:!!flags.locked};
+    var c={dropped:!!flags.dropped,passed:!!flags.passed,picked:!!flags.picked,locked:!!flags.locked};
     if(action==='dropped'){ if(c.picked) c.locked=true; c.dropped=true; return c; }
     if(action==='passed'){ c.passed=true; return c; }
-    if(action==='shown'){ c.shown=true; return c; }
     if(action==='picked'){ if(c.locked) return null; c.picked=true; return c; }
-    if(action==='wild'){ c.wild=true; return c; }
     return c;
   }
   function applyAction(action){
@@ -428,8 +426,6 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     if(blocked.length){ toast(blocked.map(function(k){ return cardText(parseKey(k)); }).join(', ')+' was picked then dropped — cannot pick again.',true); }
     else if(action==='dropped'){ toast('Marked dropped — sure rule-out.'); }
     else if(action==='passed'){ toast('Marked not picked — sure rule-out.'); }
-    else if(action==='shown'){ toast('Marked shown pure — sure rule-out.'); }
-    else if(action==='wild'){ toast('Marked used as wild — strongest clue.'); }
     else { toast('Marked picked — soft evidence; odds updated.'); }
   }
   function undo(){
@@ -516,15 +512,16 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     a=scoreCandidates({'5:S':{dropped:true}},true);
     assert(!a.list.some(function(x){ return keyOf(x.card)==='5:S'; }),'dropped eliminates 5S');
     assert(a.list.length<52,'negatives reduce count');
-    assert(isSure(nextFlags({},'shown')),'shown pure is sure');
-    assert(nextFlags({},'wild').wild,'wild flag set');
-    a=scoreCandidates({'5:S':{shown:true}},true);
-    assert(!a.list.some(function(x){ return keyOf(x.card)==='5:S'; }),'shown eliminates 5S');
-    a=scoreCandidates({'5:S':{wild:true}},true);
-    assert(a.list.length===6,'revealed wild 5S leaves 6 tiplus');
-    assert(a.list.every(function(x){
-      return wildSet(x.card.rank,x.card.suit,true).some(function(w){ return w.rank===5&&w.suit==='S'; });
-    }),'all survivors make 5S wild');
+    var cv=cardValues(scoreCandidates({},true).list,true);
+    assert(cv.length===52&&Math.abs(cv[0].p-6/52)<1e-9,'uniform card value 6/52');
+    var flags={};
+    t.forEach(function(x){ flags[keyOf(x)]={dropped:true}; });
+    a=scoreCandidates(flags,true);
+    assert(a.list.length===1&&keyOf(a.list[0].card)==='8:S','score narrows to 8S');
+    cv=cardValues(a.list,true);
+    var wild=['8:S','8:H','8:D','8:C','9:S','7:S'];
+    assert(cv.filter(function(x){ return x.p>0.99; }).length===6,'six cards at 100% wild');
+    assert(wild.every(function(k){ return cv.some(function(x){ return keyOf(x.card)===k&&x.p>0.99; }); }),'8S wild set at 100%');
     assert(scoreCandidates({'5:S':{picked:true},'5:C':{picked:true},'4:S':{picked:true}},true).list[0].prob>0.3,'strong pick weight');
     return true;
   }
@@ -538,9 +535,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   $('#allWilds').addEventListener('change',function(e){ state.allWilds=e.target.checked; state.selected=null; save(); render(); });
   $('#btnDrop').addEventListener('click',function(){ applyAction('dropped'); });
   $('#btnPass').addEventListener('click',function(){ applyAction('passed'); });
-  $('#btnShown').addEventListener('click',function(){ applyAction('shown'); });
   $('#btnPick').addEventListener('click',function(){ applyAction('picked'); });
-  $('#btnWild').addEventListener('click',function(){ applyAction('wild'); });
   $('#undo').addEventListener('click',undo);
   $('#newgame').addEventListener('click',newGame);
   render();
