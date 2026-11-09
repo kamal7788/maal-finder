@@ -132,12 +132,12 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
         </div>
       </fieldset>
     </div>
-    <p class="hint" style="margin:10px 0 0">Same-rank wilds (tiplu, alter, 2 jokers) are hard rule-outs when a seen player drops/passes one. Poplu/jhiplu only halve the adjacent tiplus.</p>
+    <p class="hint" style="margin:10px 0 0">Same-rank wilds (tiplu, alter, 2 jokers) are hard rule-outs when a seen player drops/passes one. Poplu/jhiplu also eliminate the adjacent tiplus.</p>
   </section>
 
   <section>
     <h2>Record seen-player actions</h2>
-    <p class="hint">Pick a number, then one or more suits, then the action. Only mark actions by players who have seen the tiplu. A <strong>Dropped / Not picked 3♠</strong> eliminates every rank-3 tiplu and halves 2♠/4♠. <strong>Picked</strong> is weak evidence; a 3♥ pick boosts 2♥/4♥. Tap <strong>Picked</strong> again on the same card to stack another pick.</p>
+    <p class="hint">Pick a number, then one or more suits, then the action. Only mark actions by players who have seen the tiplu. A <strong>Dropped / Not picked 3♠</strong> eliminates every rank-3 tiplu and 2♠/4♠. <strong>Picked</strong> is weak evidence; a 3♥ pick boosts 2♥/4♥. Tap <strong>+</strong> on a picked chip to stack another pick.</p>
     <div id="rankGrid" class="rank-grid"></div>
     <div id="suitGrid" class="suit-grid"></div>
     <div id="staging" class="staging"></div>
@@ -169,11 +169,10 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
     <strong>tiplu</strong> (main joker); only seen players know it. Before you show, you can only use
     public actions by players who have already seen it. A seen player never drops the tiplu, alter, or the
     2 ordinary jokers, so <strong>Dropped</strong> / <strong>Not picked</strong> hard-eliminates every
-    tiplu of that rank, in all suits. The same card also halves the two same-suit neighbours (the tiplus
-    for which it would be poplu/jhiplu), because a seer usually protects those but not always.
+    tiplu of that rank, in all suits. The same card also eliminates the two same-suit neighbours (the
+    tiplus for which it would be poplu/jhiplu).
     <strong>Picked</strong> is weak evidence: each pick multiplies that tiplu's score by 2.5, so a picked
-    3♥ boosts 2♥ and 4♥; tapping Picked again stacks. A pick that is later dropped/passed is rejected and
-    adds nothing. Scores normalize to 100%; with no input every tiplu sits at 1/52 ≈ 1.9%. If the top
+    3♥ boosts 2♥ and 4♥; the + on a picked chip stacks another pick. A pick that is later dropped/passed is rejected and adds nothing. Scores normalize to 100%; with no input every tiplu sits at 1/52 ≈ 1.9%. If the top
     tiplus are tied, the app lists the best cards to watch next. Picked then Dropped locks.</p>
   </details>
 </main>
@@ -245,29 +244,21 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
   function parseKey(k){ var p=k.split(':'); return {rank:+p[0],suit:p[1]}; }
   function isSure(c){ return !!(c&&(c.dropped||c.passed)); }
   function sortCards(a,b){ return 'SHDC'.indexOf(a.suit)-'SHDC'.indexOf(b.suit) || a.rank-b.rank; }
-  var PICK_WEIGHT=2.5, ADJ_PENALTY=0.5;
+  var PICK_WEIGHT=2.5;
   function scoreCandidates(cards,allWilds){
-    var rankNeg={},sureCards=[],picks={};
+    var sure={},picks={};
     Object.keys(cards).forEach(function(k){
       var c=cards[k]||{};
-      if(c.dropped||c.passed){
-        var p=parseKey(k);
-        rankNeg[p.rank]=(rankNeg[p.rank]||0)+1;
-        sureCards.push(p);
-      } else if(c.picked){
-        picks[k]=c.pickCount||1;
-      }
+      if(c.dropped||c.passed) sure[k]=1;
+      else if(c.picked) picks[k]=c.pickCount||1;
     });
     var list=[];
     allCandidates().forEach(function(T){
-      if(rankNeg[T.rank]) return;
-      var adj=0;
-      sureCards.forEach(function(X){
-        if(X.suit===T.suit&&(X.rank===nextRank(T.rank)||X.rank===prevRank(T.rank))) adj++;
-      });
+      var ws=wildSet(T.rank,T.suit,true);
+      if(ws.some(function(w){ return sure[keyOf(w)]; })) return;
       var m=0;
-      wildSet(T.rank,T.suit,true).forEach(function(w){ var k=keyOf(w); if(picks[k]) m+=picks[k]; });
-      list.push({card:T,matches:m,adj:adj,weight:Math.pow(ADJ_PENALTY,adj)*Math.pow(PICK_WEIGHT,m)});
+      ws.forEach(function(w){ var k=keyOf(w); if(picks[k]) m+=picks[k]; });
+      list.push({card:T,matches:m,weight:Math.pow(PICK_WEIGHT,m)});
     });
     var total=list.reduce(function(s,x){ return s+x.weight; },0);
     list.forEach(function(x){ x.prob=total?x.weight/total:0; });
@@ -306,16 +297,17 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
       if(c.passed) groups.passed.push(k);
       if(c.picked&&!c.dropped&&!c.passed) groups.picked.push(k);
     });
-    var labels={dropped:'Dropped',passed:'Not picked',picked:'Picked (soft +)'};
+    var labels={dropped:'Dropped',passed:'Not picked',picked:'Picked (soft)'};
     var html='';
     ['dropped','passed','picked'].forEach(function(g){
       if(!groups[g].length) return;
       groups[g].sort(function(a,b){ return sortCards(parseKey(a),parseKey(b)); });
       html+='<div class="rec-row"><span class="rec-label">'+labels[g]+'</span><div class="chips">'+
         groups[g].map(function(k){
-          var c=parseKey(k), f=state.cards[k];
-          var cnt=(g==='picked'&&(f.pickCount||1)>1)?'<span class="mini">×'+(f.pickCount||1)+'</span>':'';
-          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+cnt+'</span>';
+          var c=parseKey(k), f=state.cards[k], n=f.pickCount||1;
+          var cnt=(g==='picked')?'<span class="mini">×'+n+'</span>':'';
+          var plus=(g==='picked'&&n<3)?'<button type="button" data-pickmore="'+k+'" title="Add another pick">+</button>':'';
+          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+cnt+plus+'</span>';
         }).join('')+
         '</div></div>';
     });
@@ -395,7 +387,7 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
       notes.push('Picked cards add no positive evidence here: none is wild for the surviving tiplus. Record more picks, or watch the suggested cards.');
       warn=true;
     } else if(!pickedKeys.length){
-      notes.push('Only rule-out clues so far: same-rank tiplus are gone, adjacent ones are halved. Add Picked clues to sharpen.');
+      notes.push('Only rule-out clues so far: same-rank and adjacent tiplus are gone. Add Picked clues to sharpen.');
       warn=true;
     }
     var support=supportPicks(top.card);
@@ -406,7 +398,7 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
       notes.push('Top '+tied+' tiplus are tied at '+pct(top.prob)+'. One more clue breaks the tie.');
       var clues=nextClues(list);
       if(clues.length){
-        notes.push('Watch for seen players on: '+clues.map(function(x){ return cardText(x.card)+' ('+x.n+'/'+list.length+')'; }).join(', ')+'. A drop/pass eliminates its rank and halves its neighbours; a pick boosts its wild family.');
+        notes.push('Watch for seen players on: '+clues.map(function(x){ return cardText(x.card)+' ('+x.n+'/'+list.length+')'; }).join(', ')+'. A drop/pass eliminates its rank and its two same-suit neighbours; a pick boosts its wild family.');
       } else {
         notes.push('No single unrecorded card separates them — record any seen-player action.');
       }
@@ -462,12 +454,12 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
       if(next===null){ blocked.push(k); return; }
       state.cards[k]=next;
     });
-    if(action!=='picked') state.staging=[];
+    state.staging=[];
     save(); render();
     if(blocked.length){ toast(blocked.map(function(k){ return cardText(parseKey(k)); }).join(', ')+' was picked then dropped — cannot pick again.',true); }
     else if(action==='dropped'){ toast('Marked dropped — sure rule-out.'); }
     else if(action==='passed'){ toast('Marked not picked — sure rule-out.'); }
-    else { toast('Marked picked — tap Picked again to stack.'); }
+    else { toast('Marked picked — tap + on its chip to stack.'); }
   }
   function undo(){
     if(!state.history.length){ toast('Nothing to undo.',true); return; }
@@ -498,6 +490,18 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
     }
     var unstage=e.target.closest('[data-unstage]');
     if(unstage){ var j=state.staging.indexOf(unstage.getAttribute('data-unstage')); if(j>=0) state.staging.splice(j,1); render(); return; }
+    var more=e.target.closest('[data-pickmore]');
+    if(more){
+      var mk=more.getAttribute('data-pickmore'), cur=state.cards[mk]||{};
+      if((cur.pickCount||0)>=3){ toast('Max 3 picks.',true); return; }
+      var nx=nextFlags(cur,'picked');
+      if(nx===null){ toast('Cannot pick again — picked then dropped.',true); return; }
+      state.history.push(JSON.stringify(state.cards));
+      state.cards[mk]=nx;
+      save(); render();
+      toast('Picked '+cardText(parseKey(mk))+' ×'+(nx.pickCount||1)+'.');
+      return;
+    }
     var pick=e.target.closest('[data-pick]');
     if(pick){ var key=pick.getAttribute('data-pick'); state.selected=(state.selected===key)?null:key; render(); return; }
     if(e.target.closest('[data-disq]')){ state.disqualified=true; save(); render(); return; }
@@ -558,9 +562,11 @@ details p{font-size:.95rem;color:var(--muted);margin:12px 0 0;line-height:1.6}
     function byCard(list,k){ return list.filter(function(x){ return keyOf(x.card)===k; })[0]; }
     a=scoreCandidates({'3:S':{dropped:true}},true);
     assert(!a.list.some(function(x){ return x.card.rank===3; }),'drop 3S eliminates rank 3');
-    var p2S=byCard(a.list,'2:S').prob, p2H=byCard(a.list,'2:H').prob;
-    assert(p2S<p2H,'2S penalized vs 2H');
-    assert(Math.abs(p2S/p2H-ADJ_PENALTY)<1e-9,'adjacent penalty exact');
+    assert(!byCard(a.list,'2:S')&&!byCard(a.list,'4:S'),'drop 3S eliminates adjacent spades');
+    assert(byCard(a.list,'2:H'),'2H survives drop 3S');
+    a=scoreCandidates({'5:S':{picked:true},'6:C':{dropped:true}},true);
+    assert(!byCard(a.list,'5:C')&&!byCard(a.list,'7:C'),'drop 6C eliminates 5C and 7C');
+    assert(byCard(a.list,'5:S')&&byCard(a.list,'5:H'),'5S and 5H survive');
     a=scoreCandidates({'3:S':{dropped:true},'3:H':{picked:true}},true);
     assert(keyOf(a.list[0].card)==='2:H'&&keyOf(a.list[1].card)==='4:H','2H/4H lead after drop 3S + pick 3H');
     assert(Math.abs(a.list[0].prob-a.list[1].prob)<1e-9,'2H and 4H tied');
