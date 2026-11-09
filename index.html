@@ -73,6 +73,16 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   .act.pass{border-color:#3a5f86}
   .act.pick{border-color:#2f6b4f}
   .mini{font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-left:4px}
+  .chip.picked{border-color:#2f6b4f;background:#14241c}
+  .cand-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+  .cand-item{display:grid;grid-template-columns:1fr auto;grid-template-areas:"card pct" "bar bar";gap:4px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--text);cursor:pointer;font:inherit;text-align:left}
+  .cand-item:hover{border-color:var(--accent)}
+  .cand-item.top{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .cand-item.sel{border-color:#4cc38a}
+  .cand-card{grid-area:card;font-weight:700;font-size:.98rem}
+  .cand-pct{grid-area:pct;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;font-size:.85rem}
+  .cand-bar{grid-area:bar;height:4px;border-radius:99px;background:#2a323c;overflow:hidden}
+  .cand-bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
   .toast{min-height:20px;margin-top:8px;font-size:.85rem;color:var(--muted)}
   .toast.err{color:var(--red)}
   .rec-row{display:flex;gap:10px;align-items:flex-start;margin-top:8px}
@@ -110,7 +120,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
 
   <section>
     <h2>Record seen-player actions</h2>
-    <p class="hint">Pick a number, then one or more suits. Tap Dropped / Not picked / Picked to record the batch. Only mark actions by players who have seen the tiplu. Dropped and Not picked narrow the tiplu; Picked alone does not (could be a sequence).</p>
+    <p class="hint">Pick a number, then one or more suits. Tap Dropped / Not picked / Picked to record the batch. Only mark actions by players who have seen the tiplu. Dropped / Not picked rule a card out. Picked is soft evidence — it raises nearby tiplus (could be a sequence). Confidence starts at 1/52 ≈ 1.9%.</p>
     <div id="rankGrid" class="rank-grid"></div>
     <div id="suitGrid" class="suit-grid"></div>
     <div id="staging" class="staging"></div>
@@ -142,9 +152,10 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     poplu, jhiplu, alter (or ordinary jokers, if protected), so a <strong>Dropped</strong> card is not maal.
     If a seen player leaves a discard in the pile (<strong>Not picked</strong>), it is also not maal — they
     would pick a valuable card. <strong>Picked</strong> alone proves nothing: it could be for a sequence.
-    When one candidate remains you get the joker and the maal to hold. A card marked Picked and then
-    Dropped is locked and cannot be picked again. If none remain, a seen player touched a protected card
-    — a misinput or a leak.</p>
+    Picks are soft evidence: each picked card that is wild for a tiplu multiplies that tiplu's score, and
+    scores are normalized to 100%. With no input every card sits at 1/52 ≈ 1.9%. A card marked Picked and
+    then Dropped is locked and cannot be picked again. If none remain, a seen player touched a protected
+    card — a misinput or a leak.</p>
   </details>
 </main>
 
@@ -218,12 +229,34 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   function keyOf(c){ return c.rank+':'+c.suit; }
   function parseKey(k){ var p=k.split(':'); return {rank:+p[0],suit:p[1]}; }
   function isSure(c){ return !!(c&&(c.dropped||c.passed)); }
-  function sureCards(){ return Object.keys(state.cards).filter(function(k){ return isSure(state.cards[k]); }).map(parseKey); }
   function sortCards(a,b){ return 'SHDC'.indexOf(a.suit)-'SHDC'.indexOf(b.suit) || a.rank-b.rank; }
+  var PICK_WEIGHT=3;
+  function scoreCandidates(cards,allWilds){
+    var sure={},picks={};
+    Object.keys(cards).forEach(function(k){
+      var c=cards[k]||{};
+      if(c.dropped||c.passed) sure[k]=1;
+      if(c.picked) picks[k]=1;
+    });
+    var list=[];
+    allCandidates().forEach(function(T){
+      var ws=wildSet(T.rank,T.suit,allWilds);
+      if(ws.some(function(w){ return sure[w.rank+':'+w.suit]; })) return;
+      var m=0;
+      ws.forEach(function(w){ if(picks[w.rank+':'+w.suit]) m++; });
+      list.push({card:T,matches:m,weight:Math.pow(PICK_WEIGHT,m)});
+    });
+    var total=list.reduce(function(s,x){ return s+x.weight; },0);
+    list.forEach(function(x){ x.prob=total?x.weight/total:0; });
+    list.sort(function(a,b){ return b.prob-a.prob || sortCards(a.card,b.card); });
+    return {list:list,total:total,eliminated:52-list.length};
+  }
+  function analysis(){ return scoreCandidates(state.cards,state.allWilds); }
+  function pct(p){ return (p*100).toFixed(1)+'%'; }
   function render(){
-    var cands=candidatesFor(sureCards(),state.allWilds);
-    if(state.selected&&!cands.some(function(c){ return keyOf(c)===state.selected; })) state.selected=null;
-    renderPickers(); renderStaging(); renderRecorded(); renderResult(cands);
+    var a=analysis();
+    if(state.selected&&!a.list.some(function(x){ return keyOf(x.card)===state.selected; })) state.selected=null;
+    renderPickers(); renderStaging(); renderRecorded(); renderResult(a);
   }
   function renderPickers(){
     $('#rankGrid').innerHTML=RANKS.map(function(r){
@@ -250,7 +283,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       if(c.passed) groups.passed.push(k);
       if(c.picked&&!c.dropped&&!c.passed) groups.picked.push(k);
     });
-    var labels={dropped:'Dropped',passed:'Not picked',picked:'Picked (weak)'};
+    var labels={dropped:'Dropped',passed:'Not picked',picked:'Picked (soft +)'};
     var html='';
     ['dropped','passed','picked'].forEach(function(g){
       if(!groups[g].length) return;
@@ -258,7 +291,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       html+='<div class="rec-row"><span class="rec-label">'+labels[g]+'</span><div class="chips">'+
         groups[g].map(function(k){
           var c=parseKey(k), f=state.cards[k];
-          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+'</span>';
+          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+'</span>';
         }).join('')+
         '</div></div>';
     });
@@ -268,19 +301,20 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     if(state.disqualified) return ' <button class="action" type="button" data-undisq>Undo disqualify</button>';
     return ' <button class="action" type="button" data-disq>Disqualify '+esc(state.drawer)+'</button>';
   }
-  function renderResult(cands){
+  function renderResult(a){
     var status=$('#status'), banner=$('#banner'), candEl=$('#candidates'), saveEl=$('#save');
     candEl.innerHTML=''; saveEl.innerHTML=''; banner.className='banner hidden'; banner.innerHTML='';
-    if(cands.length===0){
+    var list=a.list;
+    if(!list.length){
       status.innerHTML='<strong>No possible tiplu left.</strong>';
       banner.className='banner bad';
-      banner.innerHTML='A seen player dropped or picked a card that is maal under every remaining option. Check the entry, or the seer touched a protected card (a leak / illegal action).'+disqButton();
+      banner.innerHTML='A seen player dropped or passed a card that is wild/maal under every option. Check the entry, or the seer touched a protected card (a leak / illegal action).'+disqButton();
       return;
     }
-    if(cands.length===1){
-      var c=cands[0];
-      status.innerHTML='Joker / tiplu found: '+cardHTML(c);
-      saveEl.innerHTML='<h3>Save these (maal)</h3>'+rolesFor(c,state.allWilds).map(function(r){
+    var top=list[0];
+    if(list.length===1){
+      status.innerHTML='Joker / tiplu found: '+cardHTML(top.card);
+      saveEl.innerHTML='<h3>Save these (maal)</h3>'+rolesFor(top.card,state.allWilds).map(function(r){
         return cardHTML(r.card)+'<span class="role">'+r.role+'</span>';
       }).join(' ');
       if(state.disqualified){
@@ -292,24 +326,23 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       }
       return;
     }
-    status.innerHTML='<strong>'+cands.length+'</strong> possible tiplus. Record more seen-player actions to narrow.';
-    candEl.innerHTML='<h3>Possible tiplus</h3><div class="cand-grid">'+cands.map(function(c){
-      var key=c.rank+':'+c.suit;
-      return '<button type="button" class="card-btn small'+(BY_ID[c.suit].red?' red':'')+(state.selected===key?' sel':'')+'" data-pick="'+key+'">'+LABEL[c.rank]+BY_ID[c.suit].sym+'</button>';
+    status.innerHTML='Most likely tiplu: '+cardHTML(top.card)+' — <strong>'+pct(top.prob)+'</strong> · '+list.length+' candidates';
+    candEl.innerHTML='<h3>Confidence per tiplu</h3><div class="cand-list">'+list.map(function(x,i){
+      var key=keyOf(x.card);
+      return '<button type="button" class="cand-item'+(i===0?' top':'')+(state.selected===key?' sel':'')+'" data-pick="'+key+'">'+
+        '<span class="cand-card'+(BY_ID[x.card.suit].red?' red':'')+'">'+cardText(x.card)+'</span>'+
+        '<span class="cand-pct">'+pct(x.prob)+'</span>'+
+        '<span class="cand-bar"><i style="width:'+(top.prob>0?(x.prob/top.prob*100):0)+'%"></i></span>'+
+      '</button>';
     }).join('')+'</div>';
-    if(cands.length<=12){
-      var union=saveUnion(cands,state.allWilds);
-      saveEl.innerHTML='<h3>Keep these (any could be maal)</h3><div class="chips">'+union.map(function(c){ return cardHTML(c); }).join('')+'</div>';
-    } else {
-      saveEl.innerHTML='<h3>Keep these</h3><p class="muted" style="font-size:.85rem;margin:0">Too many tiplu options for a useful list. Tap a possible tiplu above to see its exact maal, or record more actions.</p>';
+    var focus=state.selected?list.filter(function(x){ return keyOf(x.card)===state.selected; })[0]:top;
+    if(focus){
+      saveEl.innerHTML='<h3>'+(state.selected?'If tiplu = ':'Most likely maal (if ')+cardText(focus.card)+(state.selected?'':' is tiplu)')+'</h3>'+
+        rolesFor(focus.card,state.allWilds).map(function(r){ return cardHTML(r.card)+'<span class="role">'+r.role+'</span>'; }).join(' ');
     }
-    if(state.selected){
-      var sel=cands.filter(function(x){ return x.rank+':'+x.suit===state.selected; })[0];
-      if(sel){
-        saveEl.innerHTML+='<div class="selma"><h3>If tiplu = '+cardText(sel)+'</h3>'+rolesFor(sel,state.allWilds).map(function(r){
-          return cardHTML(r.card)+'<span class="role">'+r.role+'</span>';
-        }).join(' ')+'</div>';
-      }
+    if(list.length<=12){
+      var union=saveUnion(list.map(function(x){ return x.card; }),state.allWilds);
+      saveEl.innerHTML+='<div class="selma"><h3>Keep these (any could be maal)</h3><div class="chips">'+union.map(function(c){ return cardHTML(c); }).join('')+'</div></div>';
     }
   }
   var toastTimer=null;
@@ -342,7 +375,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     if(blocked.length){ toast(blocked.map(function(k){ return cardText(parseKey(k)); }).join(', ')+' was picked then dropped — cannot pick again.',true); }
     else if(action==='dropped'){ toast('Marked dropped — sure narrowing.'); }
     else if(action==='passed'){ toast('Marked not picked — sure narrowing.'); }
-    else { toast('Marked picked — weak, no narrowing (could be a sequence).'); }
+    else { toast('Marked picked — soft evidence; odds updated.'); }
   }
   function undo(){
     if(!state.history.length){ toast('Nothing to undo.',true); return; }
@@ -418,6 +451,16 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     assert(nextFlags(f,'picked')===null,'locked cannot be picked');
     assert(isSure(nextFlags({},'passed')),'not picked is sure');
     assert(isSure(nextFlags({},'dropped')),'dropped is sure');
+    var a=scoreCandidates({},true);
+    assert(a.list.length===52&&Math.abs(a.list[0].prob-1/52)<1e-9,'uniform prior 1/52');
+    var p={}; ['5:S','5:C','4:S'].forEach(function(k){ p[k]={picked:true}; });
+    a=scoreCandidates(p,true);
+    assert(a.list.length===52,'picks do not eliminate');
+    assert(keyOf(a.list[0].card)==='5:S'&&a.list[0].matches===3,'5S leads after 5S+5C+4S');
+    assert(a.list[0].prob>1/52,'picks raise confidence');
+    a=scoreCandidates({'5:S':{dropped:true}},true);
+    assert(!a.list.some(function(x){ return keyOf(x.card)==='5:S'; }),'dropped eliminates 5S');
+    assert(a.list.length<52,'negatives reduce count');
     return true;
   }
 
