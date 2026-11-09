@@ -120,7 +120,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
 
   <section>
     <h2>Record seen-player actions</h2>
-    <p class="hint">Pick a number, then one or more suits, then the action. Only mark actions by players who have seen the tiplu. A <strong>Dropped / Not picked 3♠</strong> eliminates every rank-3 tiplu and halves 2♠/4♠. <strong>Picked</strong> is weak evidence; a 3♥ pick boosts 2♥/4♥. Results show only tiplu odds.</p>
+    <p class="hint">Pick a number, then one or more suits, then the action. Only mark actions by players who have seen the tiplu. A <strong>Dropped / Not picked 3♠</strong> eliminates every rank-3 tiplu and halves 2♠/4♠. <strong>Picked</strong> is weak evidence; a 3♥ pick boosts 2♥/4♥. Tap <strong>Picked</strong> again on the same card to stack another pick.</p>
     <div id="rankGrid" class="rank-grid"></div>
     <div id="suitGrid" class="suit-grid"></div>
     <div id="staging" class="staging"></div>
@@ -154,9 +154,10 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     2 ordinary jokers, so <strong>Dropped</strong> / <strong>Not picked</strong> hard-eliminates every
     tiplu of that rank, in all suits. The same card also halves the two same-suit neighbours (the tiplus
     for which it would be poplu/jhiplu), because a seer usually protects those but not always.
-    <strong>Picked</strong> is weak evidence: each picked wild multiplies that tiplu's score by 2.5, so a
-    picked 3♥ boosts 2♥ and 4♥. Scores normalize to 100%; with no input every tiplu sits at 1/52 ≈ 1.9%.
-    If the top tiplus are tied, the app lists the best cards to watch next. Picked then Dropped locks.</p>
+    <strong>Picked</strong> is weak evidence: each pick multiplies that tiplu's score by 2.5, so a picked
+    3♥ boosts 2♥ and 4♥; tapping Picked again stacks. A pick that is later dropped/passed is rejected and
+    adds nothing. Scores normalize to 100%; with no input every tiplu sits at 1/52 ≈ 1.9%. If the top
+    tiplus are tied, the app lists the best cards to watch next. Picked then Dropped locks.</p>
   </details>
 </main>
 
@@ -236,8 +237,9 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
         var p=parseKey(k);
         rankNeg[p.rank]=(rankNeg[p.rank]||0)+1;
         sureCards.push(p);
+      } else if(c.picked){
+        picks[k]=c.pickCount||1;
       }
-      if(c.picked) picks[k]=1;
     });
     var list=[];
     allCandidates().forEach(function(T){
@@ -247,7 +249,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
         if(X.suit===T.suit&&(X.rank===nextRank(T.rank)||X.rank===prevRank(T.rank))) adj++;
       });
       var m=0;
-      wildSet(T.rank,T.suit,true).forEach(function(w){ if(picks[keyOf(w)]) m++; });
+      wildSet(T.rank,T.suit,true).forEach(function(w){ var k=keyOf(w); if(picks[k]) m+=picks[k]; });
       list.push({card:T,matches:m,adj:adj,weight:Math.pow(ADJ_PENALTY,adj)*Math.pow(PICK_WEIGHT,m)});
     });
     var total=list.reduce(function(s,x){ return s+x.weight; },0);
@@ -295,7 +297,8 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
       html+='<div class="rec-row"><span class="rec-label">'+labels[g]+'</span><div class="chips">'+
         groups[g].map(function(k){
           var c=parseKey(k), f=state.cards[k];
-          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+'</span>';
+          var cnt=(g==='picked'&&(f.pickCount||1)>1)?'<span class="mini">×'+(f.pickCount||1)+'</span>':'';
+          return '<span class="chip'+(BY_ID[c.suit].red?' red':'')+(g==='picked'?' picked':'')+'">'+cardText(c)+(f.locked?'<span class="mini">locked</span>':'')+cnt+'</span>';
         }).join('')+
         '</div></div>';
     });
@@ -308,8 +311,12 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
   function supportPicks(T){
     return wildSet(T.rank,T.suit,true).filter(function(w){
       var c=state.cards[keyOf(w)];
-      return c&&c.picked;
-    }).map(cardText);
+      return c&&c.picked&&!c.dropped&&!c.passed;
+    }).map(function(w){
+      var c=state.cards[keyOf(w)];
+      var n=c.pickCount||1;
+      return cardText(w)+(n>1?'×'+n:'');
+    });
   }
   function nextClues(list){
     var counts={};
@@ -360,7 +367,7 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     }
     var notes=[], warn=false;
     var hasAny=Object.keys(state.cards).length>0;
-    var pickedKeys=a.picks||[];
+    var pickedKeys=Object.keys(state.cards).filter(function(k){ return state.cards[k].picked; });
     var activePicks=pickedKeys.filter(function(k){ return !isSure(state.cards[k]); });
     if(!hasAny){
       notes.push('No clues yet. Record Dropped / Not picked / Picked actions by seen players.');
@@ -418,10 +425,14 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     toastTimer=setTimeout(function(){ if(el.textContent===msg){ el.textContent=''; el.className='toast'; } },3500);
   }
   function nextFlags(flags,action){
-    var c={dropped:!!flags.dropped,passed:!!flags.passed,picked:!!flags.picked,locked:!!flags.locked};
+    var c={
+      dropped:!!flags.dropped,passed:!!flags.passed,picked:!!flags.picked,
+      pickCount:(typeof flags.pickCount==='number')?flags.pickCount:(flags.picked?1:0),
+      locked:!!flags.locked
+    };
     if(action==='dropped'){ if(c.picked) c.locked=true; c.dropped=true; return c; }
     if(action==='passed'){ c.passed=true; return c; }
-    if(action==='picked'){ if(c.locked) return null; c.picked=true; return c; }
+    if(action==='picked'){ if(c.locked) return null; c.picked=true; c.pickCount=Math.min(c.pickCount+1,3); return c; }
     return c;
   }
   function applyAction(action){
@@ -509,7 +520,10 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     assert(c.length===1&&c[0].rank===8&&c[0].suit==='S','narrow to one tiplu');
     var f=nextFlags({},'picked');
     assert(f.picked&&!isSure(f),'picked alone is weak');
-    f=nextFlags(f,'dropped');
+    var f2=nextFlags(f,'picked');
+    assert(f2.pickCount===2,'pick count stacks');
+    assert(nextFlags(f2,'picked').pickCount===3,'pick count caps at 3');
+    f=nextFlags(f2,'dropped');
     assert(f.dropped&&f.locked&&isSure(f),'pick then drop locks and is sure');
     assert(nextFlags(f,'picked')===null,'locked cannot be picked');
     assert(isSure(nextFlags({},'passed')),'not picked is sure');
@@ -535,6 +549,12 @@ details p{font-size:.85rem;color:var(--muted);margin:10px 0 0}
     assert(Math.abs(a.list[0].prob-a.list[1].prob)<1e-9,'2H and 4H tied');
     assert(a.list[0].prob>0.04,'top > 4%');
     assert(scoreCandidates({'5:S':{picked:true},'5:C':{picked:true},'4:S':{picked:true}},true).list[0].prob>0.1,'halved pick weight');
+    var one=scoreCandidates({'5:S':{picked:true,pickCount:1}},true);
+    var two=scoreCandidates({'5:S':{picked:true,pickCount:2}},true);
+    assert(two.list[0].prob>one.list[0].prob,'repeat pick boosts');
+    var rej=scoreCandidates({'5:S':{picked:true,pickCount:2,dropped:true}},true);
+    var noPick=scoreCandidates({'5:S':{dropped:true}},true);
+    assert(Math.abs(rej.list[0].prob-noPick.list[0].prob)<1e-9,'rejected pick adds no boost');
     return true;
   }
 
